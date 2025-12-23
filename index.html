@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Control Heart - Love Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+        }
+
+        /* --- UI Overlay cho nội dung "I Love You" --- */
+        #love-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 50;
+            pointer-events: none; /* Không cản trở click chuột */
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #love-overlay.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        #love-text {
+            font-family: 'Dancing Script', cursive;
+            font-size: 80px;
+            color: #ff0055;
+            text-shadow: 0 0 20px rgba(255, 0, 85, 0.8), 0 0 40px rgba(255, 0, 85, 0.4);
+            margin-bottom: 20px;
+        }
+
+        #love-image {
+            width: 200px; /* Chỉnh kích thước ảnh */
+            height: 200px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 4px solid #ffa6c4ff;
+            box-shadow: 0 0 30px rgba(133, 80, 98, 0.6);
+        }
+
+        /* --- Menu & Panel cũ --- */
+        #menu-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .bar { width: 20px; height: 2px; background: #fff; transition: 0.3s; }
+        #menu-toggle.active .bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        #menu-toggle.active .bar:nth-child(2) { opacity: 0; }
+        #menu-toggle.active .bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+        #ui-panel {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(20, 20, 30, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-20px);
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        #ui-panel.visible { opacity: 1; visibility: visible; transform: translateX(0); }
+        h1 { font-size: 14px; margin: 0 0 10px 0; background: linear-gradient(to right, #ff9a9e, #fad0c4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; font-weight: 800; }
+        p, label { font-size: 11px; color: #ccc; margin-bottom: 10px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        input[type="color"] { border: none; width: 24px; height: 24px; background: none; cursor: pointer; }
+        #connection-status { font-size: 10px; color: #aaa; margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+        .dot.active { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        #video-input { display: none; }
+        #loading { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 14px; letter-spacing: 2px; font-weight: bold; }
+    </style>
+</head>
+
+<body>
+    <div id="loading">ĐANG KHỞI TẠO...</div>
+
+    <div id="love-overlay">
+        <div id="love-text">I Love You</div>
+        <img id="love-image" src="image1.jpeg" alt="Love Photo">
+    </div>
+
+    <div id="menu-toggle">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+
+    <div id="ui-panel">
+        <h1>Pro Control Heart</h1>
+        <p>
+            📏 <b>Zoom:</b> Đưa tay xa/gần camera.<br>
+            🕹️ <b>Xoay:</b> Nghiêng ngón tay.<br>
+            🖐 <b>Xòe (Bung):</b> Hiện thông điệp.<br>
+            👌 <b>Nắm:</b> Tụ trái tim lại.
+        </p>
+        <div class="control-row"><label>MÀU SẮC</label><input type="color" id="colorPicker" value="#ff0055"></div>
+        <div id="connection-status">
+            <div class="dot"></div> <span id="statusText">Tìm camera...</span>
+        </div>
+    </div>
+
+    <video id="video-input"></video>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script>
+        // --- 1. CONFIG ---
+        const particleCount = 8000;
+        let isExploded = false;
+        let wasExploded = false;
+        let isHandPresent = false;
+        let targetRotX = 0, targetRotY = 0;
+        let targetScale = 1.0, currentScale = 1.0;
+        let currentColor = new THREE.Color(0xff0055);
+
+        const HEART_SIZE = 22;
+        const REST_INTENSITY = 1.2;
+        const EXPLODE_INTENSITY = 4.0;
+
+        const loveOverlay = document.getElementById('love-overlay');
+
+        // --- 2. THREE.JS SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.015);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 65);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(new THREE.RenderPass(scene, camera));
+        composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.4, 0.0));
+
+        const pLight = new THREE.PointLight(currentColor, 2, 200);
+        scene.add(pLight);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+
+        // --- 3. PARTICLE SYSTEM ---
+        let mesh;
+        const dummy = new THREE.Object3D();
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        const mat = new THREE.MeshPhysicalMaterial({
+            color: currentColor, emissive: currentColor, emissiveIntensity: REST_INTENSITY,
+            metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.95
+        });
+
+        function isPointInStandingHeart(x, y, z) {
+            y = y * 1.2;
+            const part1 = x * x + (9 / 4) * (z * z) + y * y - 1;
+            const term2 = x * x * Math.pow(y, 3);
+            const term3 = (9 / 80) * (z * z) * Math.pow(y, 3);
+            return (Math.pow(part1, 3) - term2 - term3) <= 0;
+        }
+
+        function initParticles() {
+            if (mesh) { scene.remove(mesh); mesh.dispose(); }
+            const particleSize = 32.0 / Math.sqrt(particleCount);
+            mesh = new THREE.InstancedMesh(boxGeo, mat, particleCount);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+            const originalPos = [], currentPos = [], velocity = [], randomRot = [];
+            let i = 0;
+            while (i < particleCount) {
+                const x = (Math.random() * 3) - 1.5;
+                const y = (Math.random() * 3) - 1.5;
+                const z = (Math.random() * 3) - 1.5;
+                if (isPointInStandingHeart(x, y, z)) {
+                    const wx = x * HEART_SIZE, wy = y * HEART_SIZE, wz = z * HEART_SIZE;
+                    originalPos.push(new THREE.Vector3(wx, wy, wz));
+                    currentPos.push(new THREE.Vector3(wx, wy, wz));
+                    velocity.push(new THREE.Vector3(0, 0, 0));
+                    randomRot.push({ x: Math.random() * Math.PI, y: Math.random() * Math.PI });
+                    i++;
+                }
+            }
+            mesh.userData = { originalPos, currentPos, velocity, randomRot, baseSize: particleSize };
+            scene.add(mesh);
+        }
+        initParticles();
+
+        // --- 4. ANIMATION ---
+        const heartGroup = new THREE.Group();
+        scene.add(heartGroup);
+        const DUST_GRAVITY = -0.008;
+        const FLOOR = -50;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // LOGIC HIỆN CHỮ VÀ ẢNH
+            if (isExploded) {
+                loveOverlay.classList.add('show');
+            } else {
+                loveOverlay.classList.remove('show');
+            }
+
+            currentScale += (targetScale - currentScale) * 0.1;
+            heartGroup.rotation.y += (targetRotY - heartGroup.rotation.y) * 0.1;
+            heartGroup.rotation.x += (targetRotX - heartGroup.rotation.x) * 0.1;
+            heartGroup.scale.set(currentScale, currentScale, currentScale);
+
+            if (mesh) {
+                const targetIntensity = isExploded ? EXPLODE_INTENSITY : REST_INTENSITY;
+                mesh.material.emissiveIntensity += (targetIntensity - mesh.material.emissiveIntensity) * 0.05;
+                pLight.intensity = mesh.material.emissiveIntensity * 1.5;
+
+                const { originalPos, currentPos, velocity, randomRot, baseSize } = mesh.userData;
+                if (mesh.parent !== heartGroup) heartGroup.add(mesh);
+
+                const isInitialBurst = isExploded && !wasExploded;
+
+                for (let i = 0; i < particleCount; i++) {
+                    const cPos = currentPos[i], vel = velocity[i], oPos = originalPos[i];
+
+                    if (isExploded) {
+                        if (isInitialBurst) {
+                            const tempVec = new THREE.Vector3().copy(cPos).normalize();
+                            const explosionForce = 0.5 + Math.random() * 1.5;
+                            vel.addScaledVector(tempVec, explosionForce);
+                        }
+                        vel.y += DUST_GRAVITY;
+                        vel.multiplyScalar(0.92);
+                        cPos.add(vel);
+                        if (cPos.y < FLOOR) { cPos.y = FLOOR; vel.y *= -0.2; }
+                    } else {
+                        vel.x += (oPos.x - cPos.x) * 0.008;
+                        vel.y += (oPos.y - cPos.y) * 0.008;
+                        vel.z += (oPos.z - cPos.z) * 0.008;
+                        vel.multiplyScalar(0.94);
+                        cPos.add(vel);
+                    }
+                    dummy.position.copy(cPos);
+                    dummy.scale.set(baseSize, baseSize, baseSize);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(i, dummy.matrix);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+                wasExploded = isExploded;
+            }
+            composer.render();
+        }
+        animate();
+
+        // --- 5. MEDIAPIPE ---
+        const videoEl = document.getElementById('video-input');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.querySelector('.dot');
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                if (!isHandPresent) { statusText.innerText = "Đã kết nối"; statusDot.classList.add('active'); isHandPresent = true; }
+                const hand = results.multiHandLandmarks[0];
+                let fingersUp = 0;
+                if (hand[8].y < hand[6].y) fingersUp++;
+                if (hand[12].y < hand[10].y) fingersUp++;
+                if (hand[16].y < hand[14].y) fingersUp++;
+                if (hand[20].y < hand[18].y) fingersUp++;
+                isExploded = (fingersUp >= 3);
+
+                if (!isExploded) {
+                    const wrist = hand[0], middleMCP = hand[9], middleTip = hand[12];
+                    const handSize = Math.hypot(middleTip.x - wrist.x, middleTip.y - wrist.y);
+                    targetScale = 0.4 + (handSize * 5.0);
+                    targetRotY = -(middleMCP.x - wrist.x) * 8.0;
+                    targetRotX = (middleMCP.y - wrist.y) * 8.0;
+                }
+            } else {
+                if (isHandPresent) { statusText.innerText = "Mất tín hiệu"; statusDot.classList.remove('active'); isHandPresent = false; }
+                isExploded = false;
+                targetScale = 1.0; targetRotY = 0; targetRotX = 0;
+            }
+        }
+
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const cam = new Camera(videoEl, { onFrame: async () => { await hands.send({ image: videoEl }); }, width: 640, height: 480 });
+        cam.start().then(() => { document.getElementById('loading').style.display = 'none'; });
+
+        document.getElementById('menu-toggle').onclick = (e) => { e.currentTarget.classList.toggle('active'); document.getElementById('ui-panel').classList.toggle('visible'); };
+        document.getElementById('colorPicker').addEventListener('input', (e) => {
+            const hex = e.target.value; currentColor.set(hex);
+            if (mesh) { mesh.material.color.set(hex); mesh.material.emissive.set(hex); }
+            pLight.color.set(hex);
+            document.getElementById('love-text').style.color = hex;
+            document.getElementById('love-image').style.borderColor = hex;
+        });
+        window.onresize = () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight); };
+    </script>
+</body>
+</html>
